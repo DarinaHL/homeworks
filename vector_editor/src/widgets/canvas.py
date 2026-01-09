@@ -56,12 +56,26 @@ class EditorCanvas(QGraphicsView):
 
     # --- ПЕРЕОПРЕДЕЛЕНИЕ СОБЫТИЙ ---
     def mousePressEvent(self, event):
-        # Сохраняем начальную точку для рисования
+        # Проверяем, есть ли фигура под курсором мыши
+        items = self.scene.items(self.mapToScene(event.pos()))
+        # Если есть фигуры под курсором - это клик по существующей фигуре
+        # Не начинаем рисование новой фигуры
+        if items and event.button() == Qt.LeftButton:
+            # Есть фигура под курсором - передаем событие родителю для выделения/перемещения
+            super().mousePressEvent(event)
+            return
+        # Если фигур под курсором нет - начинаем рисование
+        if event.button() == Qt.LeftButton:
+            self.start_pos = self.mapToScene(event.pos())
+            print(f"Начало рисования в точке: {self.start_pos}, цвет: {self.current_color}")
+
+        super().mousePressEvent(event)
+        '''# Сохраняем начальную точку для рисования
         if event.button() == Qt.LeftButton:
             self.start_pos = self.mapToScene(event.pos())
             print(f"Начало рисования в точке: {self.start_pos}, цвет: {self.current_color}")  # Для отладки
 
-        super().mousePressEvent(event)
+        super().mousePressEvent(event)'''
 
     def mouseReleaseEvent(self, event):
         # Создаем фигуру только если была начальная точка и это левая кнопка
