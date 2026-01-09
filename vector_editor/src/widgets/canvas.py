@@ -26,6 +26,9 @@ class EditorCanvas(QGraphicsView):
         # Текущий активный инструмент
         self.active_tool = self.tools["select"]
 
+        # Флаг для отслеживания перетаскивания
+        self.is_dragging = False
+
     def _init_tools(self):
         """Инициализация всех доступных инструментов"""
         # Инструмент выделения
@@ -68,15 +71,53 @@ class EditorCanvas(QGraphicsView):
     # Теперь просто делегируем события текущему инструменту
 
     def mousePressEvent(self, event):
+        if self.active_tool == self.tools["select"]:
+            # Проверяем, нажали ли мы на фигуру
+            pos = self.mapToScene(event.pos())
+            item = self.scene.itemAt(pos, self.transform())
+
+            if item and hasattr(item, 'type_name'):  # Это наша фигура
+                self.is_dragging = True
+                self.setCursor(Qt.ClosedHandCursor)  # Курсор "закрытая рука" при захвате
+
         self.active_tool.mouse_press(event)
 
     def mouseMoveEvent(self, event):
+        if self.active_tool == self.tools["select"]:
+            if not self.is_dragging:
+                # Проверяем, наведена ли мышь на фигуру
+                pos = self.mapToScene(event.pos())
+                item = self.scene.itemAt(pos, self.transform())
+
+                if item and hasattr(item, 'type_name'):  # Это наша фигура
+                    if not self.is_dragging:
+                        self.setCursor(Qt.OpenHandCursor)  # Курсор "открытая рука" при наведении
+                else:
+                    self.setCursor(Qt.ArrowCursor)  # Обычная стрелка вне фигур
+
         self.active_tool.mouse_move(event)
 
     def mouseReleaseEvent(self, event):
+        if self.is_dragging:
+            self.is_dragging = False
+            if self.active_tool == self.tools["select"]:
+                # После отпускания возвращаем курсор открытой руки или стрелки
+                pos = self.mapToScene(event.pos())
+                item = self.scene.itemAt(pos, self.transform())
+                if item and hasattr(item, 'type_name'):
+                    self.setCursor(Qt.OpenHandCursor)
+                else:
+                    self.setCursor(Qt.ArrowCursor)
+
         self.active_tool.mouse_release(event)
 
-    # Дополнительно можно добавить метод для наведения курсора
+    def leaveEvent(self, event):
+        """При выходе курсора из виджета"""
+        super().leaveEvent(event)
+        if not self.is_dragging:
+            self.setCursor(Qt.ArrowCursor)
+
+    '''# Дополнительно можно добавить метод для наведения курсора
     def mouseHoverEvent(self, event):
         # Эта опциональная функция может менять курсор при наведении на фигуру
-        pass
+        pass'''

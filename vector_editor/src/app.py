@@ -76,7 +76,7 @@ class VectorEditorWindow(QMainWindow):
         self.btn_ellipse.setCheckable(True)
 
         # По умолчанию активен инструмент Select
-        self.btn_line.setChecked(True)
+        self.btn_select.setChecked(True)
         self.current_tool = "select"
 
         # Добавляем кнопки на панель
@@ -97,6 +97,7 @@ class VectorEditorWindow(QMainWindow):
 
         # Создаем холст
         self.canvas = EditorCanvas()
+        self.canvas.set_tool("select")
 
         # СВЯЗЫВАЕМ СИГНАЛЫ КНОПОК С МЕТОДАМИ
         self.btn_select.clicked.connect(lambda: self.on_change_tool("select"))

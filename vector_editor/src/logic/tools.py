@@ -2,6 +2,7 @@
 from abc import ABC, abstractmethod
 from PySide6.QtCore import Qt, QPointF
 from src.logic.factory import ShapeFactory
+from PySide6.QtWidgets import QGraphicsView
 
 
 class Tool(ABC):
@@ -86,13 +87,21 @@ class CreationTool(Tool):
 class SelectionTool(Tool):
     """Инструмент для выделения и перемещения фигур"""
 
+    def __init__(self, canvas_view):
+        super().__init__(canvas_view)
+        self.drag_start_pos = None
+        self.is_dragging = False
+
     def mouse_press(self, event):
+        QGraphicsView.mousePressEvent(self.view, event)
         # Пробрасываем событие в родительский класс QGraphicsView
         # для использования стандартной логики выделения Qt
-        super(type(self.view), self.view).mousePressEvent(event)
+        #super(type(self.view), self.view).mousePressEvent(event)
 
     def mouse_move(self, event):
-        super(type(self.view), self.view).mouseMoveEvent(event)
+        QGraphicsView.mouseMoveEvent(self.view, event)
+        #super(type(self.view), self.view).mouseMoveEvent(event)
 
     def mouse_release(self, event):
-        super(type(self.view), self.view).mouseReleaseEvent(event)
+        QGraphicsView.mouseReleaseEvent(self.view, event)
+        #super(type(self.view), self.view).mouseReleaseEvent(event)
