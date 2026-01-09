@@ -1,10 +1,4 @@
-# vector_editor/src/widgets/canvas.py
-'''from PySide6.QtWidgets import QGraphicsView, QGraphicsScene
-from PySide6.QtCore import Qt, QPointF
-from PySide6.QtGui import QPen, QBrush
-import math
-from src.logic.factory import ShapeFactory
-'''
+
 
 from PySide6.QtWidgets import QGraphicsView, QGraphicsScene
 from PySide6.QtCore import Qt, QPointF
