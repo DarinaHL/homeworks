@@ -50,6 +50,7 @@ class EditorCanvas(QGraphicsView):
         self.active_tool = tool_name
         if color:
             self.current_color = color
+            print(f"Canvas: установлен цвет {color}")  # Для отладки
         if stroke_width:
             self.stroke_width = stroke_width
 
@@ -58,6 +59,7 @@ class EditorCanvas(QGraphicsView):
         # Сохраняем начальную точку для рисования
         if event.button() == Qt.LeftButton:
             self.start_pos = self.mapToScene(event.pos())
+            print(f"Начало рисования в точке: {self.start_pos}, цвет: {self.current_color}")  # Для отладки
 
         super().mousePressEvent(event)
 
@@ -77,11 +79,12 @@ class EditorCanvas(QGraphicsView):
                     self.active_tool,
                     self.start_pos,
                     end_pos,
-                    color="black",  # Добавить цвет
-                    stroke_width=2  # Добавить толщину линии
+                    color=self.current_color,  # Используем текущий цвет
+                    stroke_width=self.stroke_width  # Используем текущую толщину
                 )
                 # 2. Добавляем объект на сцену
                 self.scene.addItem(new_shape)
+                print(f"Создана фигура: {new_shape.type_name}, цвет: {self.current_color}")
 
             except ValueError as e:
                 print(f"Ошибка создания фигуры: {e}")

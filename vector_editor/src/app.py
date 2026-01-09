@@ -130,6 +130,8 @@ from PySide6.QtWidgets import QMainWindow, QMessageBox, QWidget, QVBoxLayout, QH
 from PySide6.QtCore import Qt
 from src.widgets.canvas import EditorCanvas
 
+from PySide6.QtWidgets import QColorDialog
+from PySide6.QtGui import QColor
 
 class VectorEditorWindow(QMainWindow):
     def __init__(self):
@@ -189,6 +191,7 @@ class VectorEditorWindow(QMainWindow):
         self.btn_line = QPushButton("Line")
         self.btn_rect = QPushButton("Rect")
         self.btn_ellipse = QPushButton("Ellipse")
+        self.btn_color = QPushButton("Выбор цвета")
 
         # Делаем кнопки "залипающими" (Checkable) - как RadioButtons
         self.btn_line.setCheckable(True)
@@ -203,7 +206,16 @@ class VectorEditorWindow(QMainWindow):
         tools_layout.addWidget(self.btn_line)
         tools_layout.addWidget(self.btn_rect)
         tools_layout.addWidget(self.btn_ellipse)
+        tools_layout.addWidget(self.btn_color)
+
+        self.color_preview = QFrame()
+        self.color_preview.setFixedHeight(30)
+        self.color_preview.setStyleSheet("background-color: black; border: 1px solid #888;")
+        tools_layout.addWidget(self.color_preview)
+
         tools_layout.addStretch()  # Пружина, которая прижмет кнопки наверх
+
+
 
         # Создаем холст
         self.canvas = EditorCanvas()
@@ -212,6 +224,8 @@ class VectorEditorWindow(QMainWindow):
         self.btn_line.clicked.connect(lambda: self.on_change_tool("line"))
         self.btn_rect.clicked.connect(lambda: self.on_change_tool("rect"))
         self.btn_ellipse.clicked.connect(lambda: self.on_change_tool("ellipse"))
+
+        self.btn_color.clicked.connect(self.on_change_color)
 
         # 3. Собираем всё вместе
         main_layout.addWidget(tools_panel)
@@ -233,9 +247,28 @@ class VectorEditorWindow(QMainWindow):
 
     #ДОБАВИЛА
     def on_change_color(self):
-        # TODO: Реализовать выбор цвета через QColorDialog
-        print("Метод выбора цвета (реализовать позже)")
-    #.
+        # Открываем диалог выбора цвета
+        color = QColorDialog.getColor()
+
+        # Если пользователь выбрал цвет (не нажал Cancel)
+        if color.isValid():
+            # Получаем имя цвета в формате "#RRGGBB"
+            color_name = color.name()
+            print(f"Выбран цвет: {color_name}")
+
+            # Обновляем визуализатор цвета
+            self.color_preview.setStyleSheet(f"background-color: {color_name}; border: 1px solid #888;")
+
+            # Обновляем текст на кнопке (опционально)
+            self.btn_color.setText(f"Цвет: {color_name}")
+
+            # Передаем выбранный цвет в холст
+            self.canvas.set_tool(self.current_tool, color=color_name)
+
+            # Обновляем статусбар
+            self.statusBar().showMessage(f"Текущий цвет: {color_name}")
+        else:
+            print("Выбор цвета отменен")
 
     def closeEvent(self, event: QCloseEvent):
         # Перехватываем событие закрытия
