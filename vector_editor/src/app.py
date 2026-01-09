@@ -63,21 +63,24 @@ class VectorEditorWindow(QMainWindow):
         tools_layout = QVBoxLayout(tools_panel)
 
         # Создаем кнопки инструментов
+        self.btn_select = QPushButton("Select")  # Новая кнопка
         self.btn_line = QPushButton("Line")
         self.btn_rect = QPushButton("Rect")
         self.btn_ellipse = QPushButton("Ellipse")
         self.btn_color = QPushButton("Выбор цвета")
 
         # Делаем кнопки "залипающими" (Checkable) - как RadioButtons
+        self.btn_select.setCheckable(True)  # ДОБАВИТЬ
         self.btn_line.setCheckable(True)
         self.btn_rect.setCheckable(True)
         self.btn_ellipse.setCheckable(True)
 
-        # По умолчанию активна Линия
+        # По умолчанию активен инструмент Select
         self.btn_line.setChecked(True)
-        self.current_tool = "line"
+        self.current_tool = "select"
 
         # Добавляем кнопки на панель
+        tools_layout.addWidget(self.btn_select)  # ДОБАВИТЬ первой
         tools_layout.addWidget(self.btn_line)
         tools_layout.addWidget(self.btn_rect)
         tools_layout.addWidget(self.btn_ellipse)
@@ -96,6 +99,7 @@ class VectorEditorWindow(QMainWindow):
         self.canvas = EditorCanvas()
 
         # СВЯЗЫВАЕМ СИГНАЛЫ КНОПОК С МЕТОДАМИ
+        self.btn_select.clicked.connect(lambda: self.on_change_tool("select"))
         self.btn_line.clicked.connect(lambda: self.on_change_tool("line"))
         self.btn_rect.clicked.connect(lambda: self.on_change_tool("rect"))
         self.btn_ellipse.clicked.connect(lambda: self.on_change_tool("ellipse"))
@@ -113,6 +117,7 @@ class VectorEditorWindow(QMainWindow):
 
         # Визуальная логика "Радио-кнопок"
         # Если выбрали один инструмент, отжимаем все остальные
+        self.btn_select.setChecked(tool_name == "select")  # ДОБАВИТЬ
         self.btn_line.setChecked(tool_name == "line")
         self.btn_rect.setChecked(tool_name == "rect")
         self.btn_ellipse.setChecked(tool_name == "ellipse")

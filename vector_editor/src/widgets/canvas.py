@@ -1,10 +1,9 @@
-
-
+# vector_editor/src/widgets/canvas.py
 from PySide6.QtWidgets import QGraphicsView, QGraphicsScene
 from PySide6.QtCore import Qt, QPointF
-from PySide6.QtGui import QPen, QBrush
-import math
-from src.logic.factory import ShapeFactory
+from PySide6.QtGui import QCursor
+from src.logic.tools import CreationTool, SelectionTool
+
 
 class EditorCanvas(QGraphicsView):
     def __init__(self):
@@ -13,91 +12,71 @@ class EditorCanvas(QGraphicsView):
         self.setScene(self.scene)
         self.scene.setSceneRect(0, 0, 800, 600)
 
-        # Текущий инструмент (будет обновляться из Window)
-        self.active_tool = "line"
+        # Включаем отслеживание движения мыши (для смены курсора)
+        self.setMouseTracking(True)
 
-        #ДОБАВИЛА
-        self.current_color = "black"  # Текущий цвет
-        self.stroke_width = 2  # Текущая толщина линии
-        #.
+        # Текущие настройки рисования
+        self.current_color = "black"
+        self.stroke_width = 2
 
-        # Добавляем сохранение начальной точки
-        self.start_pos = None
-        self.current_shape = None  # Для режима предпросмотра (опционально)
+        # Инициализация инструментов
+        self.tools = {}
+        self._init_tools()
 
-        '''# --- ВРЕМЕННЫЙ ТЕСТ (удалить позже) ---
-        # Добавляем тестовые фигуры для проверки
-        from src.logic.shapes import Rectangle, Line, Ellipse
-        rect = Rectangle(50, 50, 100, 100, "red", 3)
-        line = Line(200, 50, 300, 150, "blue", 5)
-        ellipse = Ellipse(50, 200, 150, 80, "green", 2)
+        # Текущий активный инструмент
+        self.active_tool = self.tools["select"]
 
-        self.scene.addItem(rect)
-        self.scene.addItem(line)
-        self.scene.addItem(ellipse)
-        # --- КОНЕЦ ТЕСТА ---'''
+    def _init_tools(self):
+        """Инициализация всех доступных инструментов"""
+        # Инструмент выделения
+        self.tools["select"] = SelectionTool(self)
 
-    '''def set_tool(self, tool_name):
-        self.active_tool = tool_name'''
+        # Инструменты создания фигур
+        self.tools["line"] = CreationTool(self, "line", self.current_color, self.stroke_width)
+        self.tools["rect"] = CreationTool(self, "rect", self.current_color, self.stroke_width)
+        self.tools["ellipse"] = CreationTool(self, "ellipse", self.current_color, self.stroke_width)
 
     def set_tool(self, tool_name, color=None, stroke_width=None):
-        self.active_tool = tool_name
+        """Установка активного инструмента"""
+        # Обновляем настройки цвета и толщины
         if color:
             self.current_color = color
-            print(f"Canvas: установлен цвет {color}")  # Для отладки
         if stroke_width:
             self.stroke_width = stroke_width
 
+        # Обновляем настройки для всех инструментов создания
+        for tool_key in ["line", "rect", "ellipse"]:
+            if tool_key in self.tools:
+                self.tools[tool_key].color = self.current_color
+                self.tools[tool_key].stroke_width = self.stroke_width
+
+        # Устанавливаем активный инструмент
+        if tool_name in self.tools:
+            self.active_tool = self.tools[tool_name]
+
+            # Меняем курсор в зависимости от инструмента
+            if tool_name == "select":
+                self.setCursor(Qt.ArrowCursor)
+                print(f"Выбран инструмент: {tool_name} (стрелка)")
+            else:
+                self.setCursor(Qt.CrossCursor)
+                print(f"Выбран инструмент: {tool_name} (крестик)")
+        else:
+            print(f"Ошибка: неизвестный инструмент '{tool_name}'")
+
     # --- ПЕРЕОПРЕДЕЛЕНИЕ СОБЫТИЙ ---
+    # Теперь просто делегируем события текущему инструменту
+
     def mousePressEvent(self, event):
-        # Проверяем, есть ли фигура под курсором мыши
-        items = self.scene.items(self.mapToScene(event.pos()))
-        # Если есть фигуры под курсором - это клик по существующей фигуре
-        # Не начинаем рисование новой фигуры
-        if items and event.button() == Qt.LeftButton:
-            # Есть фигура под курсором - передаем событие родителю для выделения/перемещения
-            super().mousePressEvent(event)
-            return
-        # Если фигур под курсором нет - начинаем рисование
-        if event.button() == Qt.LeftButton:
-            self.start_pos = self.mapToScene(event.pos())
-            print(f"Начало рисования в точке: {self.start_pos}, цвет: {self.current_color}")
+        self.active_tool.mouse_press(event)
 
-        super().mousePressEvent(event)
-        '''# Сохраняем начальную точку для рисования
-        if event.button() == Qt.LeftButton:
-            self.start_pos = self.mapToScene(event.pos())
-            print(f"Начало рисования в точке: {self.start_pos}, цвет: {self.current_color}")  # Для отладки
-
-        super().mousePressEvent(event)'''
+    def mouseMoveEvent(self, event):
+        self.active_tool.mouse_move(event)
 
     def mouseReleaseEvent(self, event):
-        # Создаем фигуру только если была начальная точка и это левая кнопка
-        if event.button() == Qt.LeftButton and self.start_pos:
-            end_pos = self.mapToScene(event.pos())
+        self.active_tool.mouse_release(event)
 
-            # 1. Используем Фабрику для создания фигуры
-            try:
-                '''new_shape = ShapeFactory.create_shape(
-                    self.active_tool,
-                    self.start_pos,
-                    end_pos
-                )'''
-                new_shape = ShapeFactory.create_shape(
-                    self.active_tool,
-                    self.start_pos,
-                    end_pos,
-                    color=self.current_color,  # Используем текущий цвет
-                    stroke_width=self.stroke_width  # Используем текущую толщину
-                )
-                # 2. Добавляем объект на сцену
-                self.scene.addItem(new_shape)
-                print(f"Создана фигура: {new_shape.type_name}, цвет: {self.current_color}")
-
-            except ValueError as e:
-                print(f"Ошибка создания фигуры: {e}")
-
-            # Сбрасываем начальную точку
-            self.start_pos = None
-
-        super().mouseReleaseEvent(event)
+    # Дополнительно можно добавить метод для наведения курсора
+    def mouseHoverEvent(self, event):
+        # Эта опциональная функция может менять курсор при наведении на фигуру
+        pass

@@ -64,6 +64,18 @@ class Rectangle(Shape):
             }
         }
 
+    def update_geometry(self, start_point, end_point):
+        """Обновить геометрию прямоугольника по двум точкам"""
+        x1, y1 = start_point.x(), start_point.y()
+        x2, y2 = end_point.x(), end_point.y()
+
+        self.x = min(x1, x2)
+        self.y = min(y1, y2)
+        self.w = abs(x2 - x1)
+        self.h = abs(y2 - y1)
+
+        self._create_geometry()  # Перерисовываем путь
+
 
 class Line(Shape):
     def __init__(self, x1, y1, x2, y2, color="black", stroke_width=2):  # Добавили stroke_width
@@ -96,6 +108,15 @@ class Line(Shape):
             }
         }
 
+    def update_geometry(self, start_point, end_point):
+        """Обновить геометрию линии по двум точкам"""
+        self.x1 = start_point.x()
+        self.y1 = start_point.y()
+        self.x2 = end_point.x()
+        self.y2 = end_point.y()
+
+        self._create_geometry()
+
 
 class Ellipse(Shape):
     def __init__(self, x, y, w, h, color="black", stroke_width=2):  # Добавили stroke_width
@@ -125,3 +146,15 @@ class Ellipse(Shape):
                 "stroke_width": self.pen().width()  # Добавили толщину линии
             }
         }
+
+    def update_geometry(self, start_point, end_point):
+        """Обновить геометрию эллипса по двум точкам"""
+        x1, y1 = start_point.x(), start_point.y()
+        x2, y2 = end_point.x(), end_point.y()
+
+        self.x = min(x1, x2)
+        self.y = min(y1, y2)
+        self.w = abs(x2 - x1)
+        self.h = abs(y2 - y1)
+
+        self._create_geometry()
