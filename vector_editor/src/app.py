@@ -3,6 +3,7 @@ from PySide6.QtGui import QCloseEvent, QAction
 from PySide6.QtWidgets import QMainWindow, QMessageBox, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QFrame
 from PySide6.QtCore import Qt
 from src.widgets.canvas import EditorCanvas
+from src.widgets.properties import PropertiesPanel  # ИМПОРТИРУЕМ НОВЫЙ КЛАСС
 from PySide6.QtGui import QKeySequence
 from PySide6.QtWidgets import QColorDialog
 from PySide6.QtGui import QColor
@@ -10,11 +11,10 @@ from PySide6.QtGui import QColor
 
 class VectorEditorWindow(QMainWindow):
     def __init__(self):
-        # Обязательный вызов конструктора родителя!
         super().__init__()
 
         self.setWindowTitle("Vector Editor")
-        self.resize(1000, 700)  # Увеличим размер окна для удобства
+        self.resize(1200, 700)  # Увеличиваем окно для панели свойств
 
         # Сначала создаем canvas
         self.canvas = EditorCanvas()
@@ -87,13 +87,14 @@ class VectorEditorWindow(QMainWindow):
         container = QWidget()
         self.setCentralWidget(container)
 
-        # 2. Основной лейаут (Горизонтальный: Слева панель, Справа холст)
+        # 2. Основной лейаут (Горизонтальный: Слева панель инструментов, Справа холст и панель свойств)
         main_layout = QHBoxLayout(container)
-        main_layout.setContentsMargins(5, 5, 5, 5)  # Добавим небольшие отступы
+        main_layout.setContentsMargins(5, 5, 5, 5)
+        main_layout.setSpacing(5)
 
         # --- Левая панель (Палитра инструментов) ---
         tools_panel = QFrame()
-        tools_panel.setFixedWidth(150)  # Немного шире
+        tools_panel.setFixedWidth(150)
         tools_panel.setStyleSheet("""
             QFrame {
                 background-color: #f5f5f5;
@@ -187,9 +188,16 @@ class VectorEditorWindow(QMainWindow):
 
         self.btn_color.clicked.connect(self.on_change_color)
 
+        # --- Создаем панель свойств ---
+        self.props_panel = PropertiesPanel(self.canvas.scene)
+        # Подключаем сигналы от панели свойств
+        self.props_panel.color_changed.connect(self.on_props_color_changed)
+        self.props_panel.stroke_width_changed.connect(self.on_props_stroke_width_changed)
+
         # 3. Собираем всё вместе
         main_layout.addWidget(tools_panel)
         main_layout.addWidget(self.canvas)
+        main_layout.addWidget(self.props_panel)  # Добавляем панель свойств справа
 
         print("✓ Интерфейс настроен")
 
@@ -238,8 +246,27 @@ class VectorEditorWindow(QMainWindow):
 
             # Обновляем статусбар
             self.statusBar().showMessage(f"Текущий цвет: {color_name} (применен к выделенным фигурам)")
-        else:
-            print("Выбор цвета отменен")
+
+    def on_props_color_changed(self, color_name):
+        """Обработчик изменения цвета из панели свойств"""
+        print(f"Цвет изменен из панели свойств: {color_name}")
+        self.current_color = color_name
+
+        # Обновляем визуализатор цвета
+        self.color_preview.setStyleSheet(f"""
+            QFrame {{
+                background-color: {color_name}; 
+                border: 2px solid #888888;
+                border-radius: 4px;
+            }}
+        """)
+
+        # Обновляем текст на кнопке
+        self.btn_color.setText(f"Цвет: {color_name[1:].upper()}")
+
+    def on_props_stroke_width_changed(self, width):
+        """Обработчик изменения толщины линии из панели свойств"""
+        print(f"Толщина линии изменена из панели свойств: {width}")
 
     def closeEvent(self, event: QCloseEvent):
         # Перехватываем событие закрытия

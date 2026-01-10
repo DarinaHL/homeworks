@@ -33,6 +33,12 @@ class Shape(QGraphicsPathItem, ABC, metaclass=MetaShape):
         pen.setColor(QColor(color))
         self.setPen(pen)
 
+    def set_stroke_width(self, width: int):
+        """Устанавливает толщину линии фигуры"""
+        pen = self.pen()
+        pen.setWidth(width)
+        self.setPen(pen)
+
     @property
     @abstractmethod
     def type_name(self) -> str:
@@ -268,3 +274,12 @@ class Group(QGraphicsItemGroup):
             child.setParentItem(None)
             scene.addItem(child)
             child.setSelected(True)
+
+    def set_stroke_width(self, width: int):
+        """
+        Рекурсивно меняет толщину линий всех детей.
+        Паттерн Composite: группа делегирует операцию детям.
+        """
+        for child in self.childItems():
+            if isinstance(child, Shape):
+                child.set_stroke_width(width)
