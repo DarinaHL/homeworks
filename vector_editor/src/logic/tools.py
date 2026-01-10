@@ -93,15 +93,16 @@ class SelectionTool(Tool):
         self.is_dragging = False
 
     def mouse_press(self, event):
-        QGraphicsView.mousePressEvent(self.view, event)
-        # Пробрасываем событие в родительский класс QGraphicsView
-        # для использования стандартной логики выделения Qt
-        #super(type(self.view), self.view).mousePressEvent(event)
+        """Обработка нажатия мыши - делегируем основному холсту"""
+        # Пустая реализация - вся логика теперь в EditorCanvas
+        pass
 
     def mouse_move(self, event):
-        QGraphicsView.mouseMoveEvent(self.view, event)
-        #super(type(self.view), self.view).mouseMoveEvent(event)
+        """Обработка движения мыши - делегируем основному холсту"""
+        # Пустая реализация - вся логика теперь в EditorCanvas
+        pass
 
     def mouse_release(self, event):
-        QGraphicsView.mouseReleaseEvent(self.view, event)
-        #super(type(self.view), self.view).mouseReleaseEvent(event)
+        """Обработка отпускания мыши - делегируем основному холсту"""
+        # Пустая реализация - вся логика теперь в EditorCanvas
+        pass

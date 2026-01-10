@@ -10,6 +10,11 @@ def main():
     # Инициализация и настройка темы оформления (опционально)
     app.setStyle("Fusion")
 
+    # Устанавливаем уникальное имя приложения для избежания конфликтов
+    app.setApplicationName("Vector Editor")
+    app.setOrganizationName("VectorEditor")
+    app.setOrganizationDomain("vectoreditor.example.com")
+
     window = VectorEditorWindow()
     window.show()
 
