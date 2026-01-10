@@ -289,7 +289,7 @@ class EditorCanvas(QGraphicsView):
             self.setCursor(Qt.ArrowCursor)
 
     def group_selection(self):
-        """Создает группу из выделенных элементов - ПРАВИЛЬНАЯ версия"""
+        """Создает группу из выделенных элементов - ИСПРАВЛЕННАЯ версия"""
         selected_items = self.scene.selectedItems()
 
         print(f"Попытка создать группу из {len(selected_items)} элементов")
@@ -314,27 +314,46 @@ class EditorCanvas(QGraphicsView):
                 print("Недостаточно фигур для группировки")
                 return
 
-            # Создаем новую группу
-            group = Group()
+            # ИЩЕМ МИНИМАЛЬНЫЕ КООРДИНАТЫ для центра группы
+            min_x = float('inf')
+            min_y = float('inf')
+
+            for item in items_to_group:
+                item_scene_pos = item.scenePos()
+                min_x = min(min_x, item_scene_pos.x())
+                min_y = min(min_y, item_scene_pos.y())
+
+            # СОЗДАЕМ ГРУППУ В РАСЧЕТНОЙ ТОЧКЕ
+            group = Group(min_x, min_y)  # Передаем координаты группы
             self.scene.addItem(group)
 
-            # Собираем информацию о позициях элементов
+            # ПЕРЕМЕЩАЕМ ЭЛЕМЕНТЫ В ГРУППУ
             for item in items_to_group:
-                # Сохраняем позицию элемента в сцене
+                # Получаем позицию элемента в сцене
                 item_scene_pos = item.scenePos()
 
                 # Снимаем выделение
                 item.setSelected(False)
 
-                # Добавляем в группу (это автоматически установит правильную позицию)
+                # Вычисляем локальные координаты относительно группы
+                local_x = item_scene_pos.x() - min_x
+                local_y = item_scene_pos.y() - min_y
+
+                # Удаляем элемент со сцены
+                self.scene.removeItem(item)
+
+                # Устанавливаем локальную позицию
+                item.setPos(local_x, local_y)
+
+                # Добавляем в группу
                 group.addToGroup(item)
 
-                # Устанавливаем позицию элемента относительно группы
-                item.setPos(item_scene_pos - group.scenePos())
+            # Устанавливаем позицию группы на сцене
+            group.setPos(min_x, min_y)
 
             # Выделяем группу
             group.setSelected(True)
-            print(f"✓ Создана группа с {len(items_to_group)} элементами")
+            print(f"✓ Создана группа с {len(items_to_group)} элементами в позиции ({min_x}, {min_y})")
 
         except Exception as e:
             print(f"Ошибка при создании группы: {e}")
