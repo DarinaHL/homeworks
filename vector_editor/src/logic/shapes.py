@@ -8,6 +8,7 @@ class MetaShape(type(QGraphicsPathItem), ABCMeta): pass
 
 # ЗАМЕНИТЬ текущий код классов фигур на этот:
 
+
 class Shape(QGraphicsPathItem, ABC, metaclass=MetaShape):
     def __init__(self, color="black", stroke_width=2):  # Добавили параметр stroke_width
         super().__init__()
@@ -190,14 +191,20 @@ class Ellipse(Shape):
         self._create_geometry()
 
 
-class Group(QGraphicsItemGroup, Shape):
+class Group(QGraphicsItemGroup):
     """Класс для группировки фигур с использованием паттерна Composite"""
 
     def __init__(self, x=0, y=0):
         # Инициализация Qt-части
         QGraphicsItemGroup.__init__(self)
         # Инициализация нашей Shape части с дефолтными параметрами
-        Shape.__init__(self, "black", 2)
+        #Shape.__init__(self, "black", 2)
+
+        color = "black"
+        stroke_width = 2
+
+        self._color = color
+        self._stroke_width = stroke_width
 
         # Устанавливаем позицию группы
         self.setPos(x, y)
