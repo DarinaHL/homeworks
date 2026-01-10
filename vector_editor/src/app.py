@@ -20,6 +20,9 @@ class VectorEditorWindow(QMainWindow):
         self.canvas = EditorCanvas()
         self.canvas.set_tool("select")
 
+        # Текущий выбранный цвет
+        self.current_color = "black"
+
         # Затем настраиваем UI
         self._init_ui()
         self._setup_layout()
@@ -78,7 +81,6 @@ class VectorEditorWindow(QMainWindow):
         """Обработчик для разгруппировки"""
         print("Нажата Shift+U - разгруппировка...")
         self.canvas.ungroup_selection()
-
 
     def _setup_layout(self):
         # 1. Создаем главный контейнер
@@ -159,10 +161,21 @@ class VectorEditorWindow(QMainWindow):
         group_tip.setStyleSheet("text-align: left; font-style: italic; background-color: #f0f0f0;")
         tools_layout.addWidget(group_tip)
 
-        tip_text = QPushButton("1. Выделите фигуры\n2. Нажмите Ctrl+Shift+G")
+        tip_text = QPushButton("1. Выделите фигуры\n2. Нажмите Shift+G")
         tip_text.setEnabled(False)
         tip_text.setStyleSheet("text-align: left; font-size: 10pt; background-color: #f8f8f8;")
         tools_layout.addWidget(tip_text)
+
+        # Добавим подсказку про изменение цвета
+        color_tip = QPushButton("Изменить цвет:")
+        color_tip.setEnabled(False)
+        color_tip.setStyleSheet("text-align: left; font-style: italic; background-color: #f0f0f0;")
+        tools_layout.addWidget(color_tip)
+
+        color_tip_text = QPushButton("1. Выделите фигуры\n2. Нажмите кнопку\n'Выбор цвета'")
+        color_tip_text.setEnabled(False)
+        color_tip_text.setStyleSheet("text-align: left; font-size: 10pt; background-color: #f8f8f8;")
+        tools_layout.addWidget(color_tip_text)
 
         tools_layout.addStretch()  # Пружина, которая прижмет кнопки наверх
 
@@ -191,7 +204,7 @@ class VectorEditorWindow(QMainWindow):
         self.btn_ellipse.setChecked(tool_name == "ellipse")
 
         # Передаем информацию в холст
-        self.canvas.set_tool(tool_name)
+        self.canvas.set_tool(tool_name, color=self.current_color)
 
     def on_change_color(self):
         # Открываем диалог выбора цвета
@@ -201,6 +214,9 @@ class VectorEditorWindow(QMainWindow):
         if color.isValid():
             color_name = color.name()
             print(f"Выбран цвет: {color_name}")
+
+            # Сохраняем текущий цвет
+            self.current_color = color_name
 
             # Обновляем визуализатор цвета
             self.color_preview.setStyleSheet(f"""
@@ -217,8 +233,11 @@ class VectorEditorWindow(QMainWindow):
             # Передаем выбранный цвет в холст
             self.canvas.set_tool(self.current_tool, color=color_name)
 
+            # Изменяем цвет ВСЕХ выделенных фигур
+            self.canvas.change_selected_items_color(color_name)
+
             # Обновляем статусбар
-            self.statusBar().showMessage(f"Текущий цвет: {color_name}")
+            self.statusBar().showMessage(f"Текущий цвет: {color_name} (применен к выделенным фигурам)")
         else:
             print("Выбор цвета отменен")
 

@@ -80,6 +80,48 @@ class EditorCanvas(QGraphicsView):
         else:
             print(f"Ошибка: неизвестный инструмент '{tool_name}'")
 
+    def change_selected_items_color(self, color):
+        """Изменяет цвет всех выделенных фигур"""
+        selected_items = self.scene.selectedItems()
+
+        if not selected_items:
+            print("Нет выделенных фигур для изменения цвета")
+            return
+
+        print(f"Меняем цвет у {len(selected_items)} выделенных фигур на {color}")
+
+        changed_count = 0
+
+        for item in selected_items:
+            # Проверяем, является ли элемент нашей фигурой
+            if hasattr(item, 'type_name'):
+                try:
+                    # Проверяем, есть ли у элемента метод set_active_color
+                    if hasattr(item, 'set_active_color'):
+                        item.set_active_color(color)
+                        changed_count += 1
+                        print(f"✓ Изменен цвет фигуры типа: {item.type_name}")
+                    else:
+                        print(f"У фигуры типа {item.type_name} нет метода set_active_color")
+                except Exception as e:
+                    print(f"Ошибка при изменении цвета фигуры: {e}")
+            # Также обрабатываем группы
+            elif isinstance(item, Group):
+                try:
+                    item.set_active_color(color)
+                    changed_count += 1
+                    print(f"✓ Изменен цвет группы (всех элементов внутри)")
+                except Exception as e:
+                    print(f"Ошибка при изменении цвета группы: {e}")
+
+        print(f"✓ Изменен цвет у {changed_count} фигур")
+
+        # Обновляем цвет для инструментов рисования
+        self.current_color = color
+        for tool_key in ["line", "rect", "ellipse"]:
+            if tool_key in self.tools:
+                self.tools[tool_key].color = color
+
     # --- ПЕРЕОПРЕДЕЛЕНИЕ СОБЫТИЙ ---
 
     def mousePressEvent(self, event):
