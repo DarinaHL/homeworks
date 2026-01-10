@@ -40,6 +40,10 @@ class EditorCanvas(QGraphicsView):
         # Флаг для отслеживания выделения рамкой
         self.is_selecting = False
 
+        # Для перетаскивания
+        self.drag_start_pos = None
+        self.drag_item = None
+
     def _init_tools(self):
         """Инициализация всех доступных инструментов"""
         # Инструмент выделения
@@ -126,34 +130,95 @@ class EditorCanvas(QGraphicsView):
 
     def mousePressEvent(self, event):
         if self.active_tool == self.tools["select"]:
-            super().mousePressEvent(event)
-        else:
-            event.accept()
+            shift_pressed = event.modifiers() & Qt.ShiftModifier
 
-        if self.active_tool == self.tools["select"]:
+            # Получаем элемент под курсором
+            pos = self.mapToScene(event.pos())
+            item = self.scene.itemAt(pos, self.transform())
+
             if event.button() == Qt.LeftButton:
-                pos = self.mapToScene(event.pos())
-                item = self.scene.itemAt(pos, self.transform())
-
                 if item and hasattr(item, 'type_name'):
-                    self.is_dragging = True
-                    self.setCursor(Qt.ClosedHandCursor)
+                    # Если нажат Shift
+                    if shift_pressed:
+                        # Меняем состояние выделения элемента
+                        item.setSelected(not item.isSelected())
+                        print(f"Shift+клик по {item.type_name}, новое состояние выделения: {item.isSelected()}")
+
+                        # Если элемент стал выделенным, готовимся к перетаскиванию
+                        if item.isSelected():
+                            self.drag_item = item
+                            self.drag_start_pos = event.pos()
+                            self.is_dragging = True
+                        else:
+                            # Если сняли выделение
+                            self.is_dragging = False
+                    else:
+                        # Если Shift не нажат
+                        if not item.isSelected():
+                            # Если элемент не выделен, очищаем все выделения и выделяем его
+                            self.scene.clearSelection()
+                            item.setSelected(True)
+
+                        # Готовимся к перетаскиванию
+                        self.drag_item = item
+                        self.drag_start_pos = event.pos()
+                        self.is_dragging = True
                 else:
+                    # Клик по пустому месту
+                    if not shift_pressed:
+                        self.scene.clearSelection()
+
                     self.is_selecting = True
+                    self.is_dragging = False
                     self.selection_start_pos = event.pos()
                     self.rubber_band.setGeometry(QRect(self.selection_start_pos, event.pos()).normalized())
                     self.rubber_band.show()
 
-        self.active_tool.mouse_press(event)
+            event.accept()
+        else:
+            # Для других инструментов передаем событие дальше
+            self.active_tool.mouse_press(event)
 
     def mouseMoveEvent(self, event):
         if self.active_tool == self.tools["select"]:
-            super().mouseMoveEvent(event)
-
             if self.is_selecting and self.rubber_band.isVisible():
+                # Обновляем rubber band
                 self.rubber_band.setGeometry(QRect(self.selection_start_pos, event.pos()).normalized())
 
-            if not self.is_dragging and not self.is_selecting:
+            elif self.is_dragging and self.drag_start_pos and self.drag_item:
+                # Перетаскиваем ВСЕ выделенные элементы
+                selected_items = self.scene.selectedItems()
+
+                if selected_items:
+                    # Вычисляем дельту перемещения
+                    current_pos = event.pos()
+                    delta = current_pos - self.drag_start_pos
+
+                    # Преобразуем дельту в координаты сцены
+                    start_scene_pos = self.mapToScene(self.drag_start_pos)
+                    current_scene_pos = self.mapToScene(current_pos)
+                    scene_delta = current_scene_pos - start_scene_pos
+
+                    # Перемещаем все выделенные элементы
+                    for item in selected_items:
+                        if hasattr(item, 'type_name'):
+                            # Получаем текущую позицию
+                            current_item_pos = item.pos()
+
+                            # Если это первый шаг перетаскивания, запоминаем начальную позицию
+                            if not hasattr(item, '_drag_initial_pos'):
+                                item._drag_initial_pos = current_item_pos
+
+                            # Вычисляем новую позицию
+                            new_pos = item._drag_initial_pos + scene_delta
+
+                            # Устанавливаем новую позицию
+                            item.setPos(new_pos)
+
+                    print(f"Перетаскивание {len(selected_items)} элементов, delta: {scene_delta}")
+
+            elif not self.is_dragging and not self.is_selecting:
+                # Просто движение курсора - меняем курсор
                 pos = self.mapToScene(event.pos())
                 item = self.scene.itemAt(pos, self.transform())
 
@@ -161,6 +226,8 @@ class EditorCanvas(QGraphicsView):
                     self.setCursor(Qt.OpenHandCursor)
                 else:
                     self.setCursor(Qt.ArrowCursor)
+
+            event.accept()
         else:
             event.accept()
 
@@ -168,29 +235,49 @@ class EditorCanvas(QGraphicsView):
 
     def mouseReleaseEvent(self, event):
         if self.active_tool == self.tools["select"]:
-            super().mouseReleaseEvent(event)
-
             if event.button() == Qt.LeftButton:
                 if self.is_selecting:
+                    # Завершаем выделение рамкой
                     self.is_selecting = False
                     self.rubber_band.hide()
 
                     rect = self.mapToScene(self.rubber_band.geometry()).boundingRect()
                     items_in_rect = self.scene.items(rect)
 
+                    shift_pressed = event.modifiers() & Qt.ShiftModifier
+
+                    if not shift_pressed:
+                        # Если Shift не нажат, очищаем выделение перед добавлением новых
+                        self.scene.clearSelection()
+
                     for item in items_in_rect:
                         if hasattr(item, 'type_name'):
                             item.setSelected(True)
 
                 if self.is_dragging:
+                    # Завершаем перетаскивание
                     self.is_dragging = False
 
+                    # Очищаем временные данные перетаскивания
+                    selected_items = self.scene.selectedItems()
+                    for item in selected_items:
+                        if hasattr(item, '_drag_initial_pos'):
+                            del item._drag_initial_pos
+
+                    self.drag_item = None
+                    self.drag_start_pos = None
+
+                    # Возвращаем нормальный курсор
                     pos = self.mapToScene(event.pos())
                     item = self.scene.itemAt(pos, self.transform())
                     if item and hasattr(item, 'type_name'):
                         self.setCursor(Qt.OpenHandCursor)
                     else:
                         self.setCursor(Qt.ArrowCursor)
+
+                    print("Перетаскивание завершено")
+
+            event.accept()
         else:
             event.accept()
 
