@@ -4,9 +4,12 @@ from PySide6.QtWidgets import QMainWindow, QMessageBox, QWidget, QVBoxLayout, QH
 from PySide6.QtCore import Qt
 from src.widgets.canvas import EditorCanvas
 from src.widgets.properties import PropertiesPanel  # ИМПОРТИРУЕМ НОВЫЙ КЛАСС
-from PySide6.QtWidgets import QColorDialog
+from PySide6.QtWidgets import QColorDialog, QFileDialog
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import QUndoView  # QUndoView остаётся в QtWidgets
+import json
+from src.logic.io import JsonSaveStrategy, ImageSaveStrategy, FileManager
+from src.logic.factory import ShapeFactory
 
 
 class VectorEditorWindow(QMainWindow):
@@ -40,15 +43,43 @@ class VectorEditorWindow(QMainWindow):
         # Добавляем меню Edit
         edit_menu = menubar.addMenu("&Edit")
 
-        # 3. Создаем Action (Действие)
-        exit_action = QAction("Exit", self)
+        # 3. Создаем Actions для меню File
+        # Action для сохранения
+        save_action = QAction("&Save Project", self)
+        save_action.setShortcut("Ctrl+S")
+        save_action.setStatusTip("Save current project")
+        save_action.triggered.connect(self.on_save_clicked)
+        file_menu.addAction(save_action)
+
+        # Action для загрузки
+        open_action = QAction("&Open Project", self)
+        open_action.setShortcut("Ctrl+O")
+        open_action.setStatusTip("Open saved project")
+        open_action.triggered.connect(self.on_open_clicked)
+        file_menu.addAction(open_action)
+
+        # Action для экспорта в PNG
+        export_png_action = QAction("&Export as PNG", self)
+        export_png_action.setStatusTip("Export canvas as PNG image")
+        export_png_action.triggered.connect(lambda: self.on_export_clicked("PNG"))
+        file_menu.addAction(export_png_action)
+
+        # Action для экспорта в JPG
+        export_jpg_action = QAction("&Export as JPG", self)
+        export_jpg_action.setStatusTip("Export canvas as JPG image")
+        export_jpg_action.triggered.connect(lambda: self.on_export_clicked("JPG"))
+        file_menu.addAction(export_jpg_action)
+
+        file_menu.addSeparator()
+
+        # Action для выхода
+        exit_action = QAction("&Exit", self)
         exit_action.setShortcut("Ctrl+Q")
         exit_action.setStatusTip("Close the application")
         exit_action.triggered.connect(self.close)
-
-        # Добавляем Action в меню
         file_menu.addAction(exit_action)
 
+        # 4. Создаем Actions для меню Edit
         # Действие для Undo
         undo_action = QAction("&Undo", self)
         undo_action.setShortcut(QKeySequence.Undo)
@@ -93,9 +124,10 @@ class VectorEditorWindow(QMainWindow):
         history_action.triggered.connect(self.on_show_history)
         edit_menu.addAction(history_action)
 
-        # 4. Создаем Тулбар
+        # 5. Создаем Тулбар
         toolbar = self.addToolBar("Main Toolbar")
-        toolbar.addAction(exit_action)
+        toolbar.addAction(open_action)
+        toolbar.addAction(save_action)
         toolbar.addSeparator()
         toolbar.addAction(undo_action)
         toolbar.addAction(redo_action)
@@ -103,6 +135,98 @@ class VectorEditorWindow(QMainWindow):
         toolbar.addAction(delete_action)
 
         print("✓ Меню и тулбары созданы")
+
+    def on_save_clicked(self):
+        """Обработчик для сохранения проекта"""
+        # 1. Спрашиваем путь
+        path, filter = QFileDialog.getSaveFileName(
+            self, "Save Project", "",
+            "Vector Project (*.json)"
+        )
+
+        if not path:
+            return
+
+        # 2. Выбираем стратегию
+        strategy = JsonSaveStrategy()
+
+        # 3. Выполняем сохранение
+        try:
+            # Передаем сцену и список всех элементов
+            # Важно: инвертируем список для правильного порядка Z-Index
+            items = self.canvas.scene.items()[::-1]
+            strategy.save(path, self.canvas.scene, items)
+            self.statusBar().showMessage(f"Project saved to {path}")
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to save: {str(e)}")
+
+    def on_open_clicked(self):
+        """Обработчик для открытия проекта"""
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Open Project", "",
+            "Vector Project (*.json)"
+        )
+
+        if not path:
+            return
+
+        try:
+            with open(path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+
+            # ВАЖНО: Очистка перед загрузкой
+            self.canvas.scene.clear()
+            self.canvas.undo_stack.clear()  # Сброс истории!
+
+            # Восстановление через Фабрику
+            for shape_data in data.get("shapes", []):
+                shape = ShapeFactory.from_dict(shape_data)
+                self.canvas.scene.addItem(shape)
+
+            # Обновляем размер холста
+            width = data.get("canvas_width", 800)
+            height = data.get("canvas_height", 600)
+            self.canvas.scene.setSceneRect(0, 0, width, height)
+
+            self.statusBar().showMessage(f"Project loaded from {path}")
+
+        except Exception as e:
+            QMessageBox.critical(self, "Load Error", f"Failed to load: {str(e)}")
+
+    def on_export_clicked(self, format_type="PNG"):
+        """Обработчик для экспорта в изображение"""
+        # Определяем фильтр в зависимости от формата
+        if format_type == "PNG":
+            filter = "PNG Image (*.png)"
+            default_ext = ".png"
+        else:
+            filter = "JPEG Image (*.jpg *.jpeg)"
+            default_ext = ".jpg"
+
+        # Спрашиваем путь
+        path, _ = QFileDialog.getSaveFileName(
+            self, f"Export as {format_type}", "",
+            filter
+        )
+
+        if not path:
+            return
+
+        # Добавляем расширение если нужно
+        if not path.lower().endswith(default_ext):
+            path += default_ext
+
+        # Выбираем стратегию
+        strategy = ImageSaveStrategy(format_type)
+
+        # Выполняем сохранение
+        try:
+            # Для изображения нам нужна только сцена
+            items = []  # Для ImageSaveStrategy items не используются
+            strategy.save(path, self.canvas.scene, items)
+            self.statusBar().showMessage(f"Exported to {path}")
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to export: {str(e)}")
 
     def on_undo(self):
         """Обработчик для Undo"""
@@ -245,6 +369,17 @@ class VectorEditorWindow(QMainWindow):
         undo_tip_text.setStyleSheet("text-align: left; font-size: 10pt; background-color: #f8f8f8;")
         tools_layout.addWidget(undo_tip_text)
 
+        # Добавим подсказку про сохранение/загрузку
+        file_tip = QPushButton("Файл:")
+        file_tip.setEnabled(False)
+        file_tip.setStyleSheet("text-align: left; font-style: italic; background-color: #f0f0f0;")
+        tools_layout.addWidget(file_tip)
+
+        file_tip_text = QPushButton("Ctrl+O - Открыть\nCtrl+S - Сохранить")
+        file_tip_text.setEnabled(False)
+        file_tip_text.setStyleSheet("text-align: left; font-size: 10pt; background-color: #f8f8f8;")
+        tools_layout.addWidget(file_tip_text)
+
         tools_layout.addStretch()  # Пружина, которая прижмет кнопки наверх
 
         # СВЯЗЫВАЕМ СИГНАЛЫ КНОПОК С МЕТОДАМИ
@@ -341,10 +476,10 @@ class VectorEditorWindow(QMainWindow):
         reply = QMessageBox.question(
             self, "Подтверждение",
             "Вы уверены, что хотите выйти?",
-            QMessageBox.Yes | QMessageBox.No
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         )
 
-        if reply == QMessageBox.Yes:
+        if reply == QMessageBox.StandardButton.Yes:
             print("Window Closed: Разрешаем закрытие")
             event.accept()
         else:

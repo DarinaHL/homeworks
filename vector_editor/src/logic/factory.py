@@ -3,7 +3,7 @@ from src.logic.shapes import Group
 
 class ShapeFactory:
     @staticmethod
-    def create_shape(shape_type: str, start_point, end_point, color="black", stroke_width=2):  # Добавили stroke_width
+    def create_shape(shape_type: str, start_point, end_point, color="black", stroke_width=2):
         """
         Универсальный метод создания фигур.
         Принимает начальную и конечную точку (от мыши).
@@ -18,11 +18,11 @@ class ShapeFactory:
         h = abs(y2 - y1)
 
         if shape_type == "rect":
-            return Rectangle(x, y, w, h, color, stroke_width)  # Добавили stroke_width
+            return Rectangle(x, y, w, h, color, stroke_width)
         elif shape_type == "ellipse":
-            return Ellipse(x, y, w, h, color, stroke_width)  # Добавили stroke_width
+            return Ellipse(x, y, w, h, color, stroke_width)
         elif shape_type == "line":
-            return Line(x1, y1, x2, y2, color, stroke_width)  # Добавили stroke_width
+            return Line(x1, y1, x2, y2, color, stroke_width)
         else:
             raise ValueError(f"Unknown shape type: {shape_type}")
 
@@ -30,13 +30,13 @@ class ShapeFactory:
     def create_from_dict(data: dict):
         """
         Альтернативный метод создания фигур из словаря (для загрузки из файла)
-        Теперь ожидает структуру с ключом "props"
+        Ожидает структуру с ключом "props"
         """
         shape_type = data.get("type")
-        props = data.get("props", {})  # ЗАМЕНИЛИ "coords" на "props"
-        pos = data.get("pos", [0, 0])  # Добавить поддержку позиции
+        props = data.get("props", {})
+        pos = data.get("pos", [0, 0])
         color = props.get("color", "black")
-        stroke_width = props.get("stroke_width", 2)  # Добавили толщину линии
+        stroke_width = props.get("stroke_width", 2)
 
         if shape_type == "rect":
             x = props.get("x", 0)
@@ -44,7 +44,7 @@ class ShapeFactory:
             w = props.get("w", 100)
             h = props.get("h", 100)
             rect = Rectangle(x, y, w, h, color, stroke_width)
-            rect.setPos(pos[0], pos[1])  # Устанавливаем позицию
+            rect.setPos(pos[0], pos[1])
             return rect
 
         elif shape_type == "ellipse":
@@ -84,7 +84,6 @@ class ShapeFactory:
             group.addToGroup(child)
 
         return group
-
 
     @staticmethod
     def from_dict(data: dict):

@@ -6,8 +6,6 @@ from PySide6.QtWidgets import QGraphicsItemGroup
 
 class MetaShape(type(QGraphicsPathItem), ABCMeta): pass
 
-# ЗАМЕНИТЬ текущий код классов фигур на этот:
-
 
 class Shape(QGraphicsPathItem, ABC, metaclass=MetaShape):
     def __init__(self, color="black", stroke_width=2):  # Добавили параметр stroke_width
@@ -35,6 +33,7 @@ class Shape(QGraphicsPathItem, ABC, metaclass=MetaShape):
 
     def set_stroke_width(self, width: int):
         """Устанавливает толщину линии фигуры"""
+        self._stroke_width = width
         pen = self.pen()
         pen.setWidth(width)
         self.setPen(pen)
@@ -73,15 +72,15 @@ class Rectangle(Shape):
         return "rect"
 
     def to_dict(self) -> dict:
-        # Изменили структуру: теперь "props" вместо "coords"
+        # Исправленная структура для совместимости с factory.py
         return {
             "type": self.type_name,
-            "pos": [self.x, self.y],  # Сохраняем позицию
-            "props": {  # ЗАМЕНИТЬ "coords" на "props"
+            "pos": [self.pos().x(), self.pos().y()],  # Используем pos() вместо self.x, self.y
+            "props": {
                 "x": self.x, "y": self.y,
                 "w": self.w, "h": self.h,
                 "color": self.pen().color().name(),
-                "stroke_width": self.pen().width()  # Добавили толщину линии
+                "stroke_width": self.pen().width()
             }
         }
 
@@ -109,8 +108,6 @@ class Line(Shape):
         self.y1 = y1
         self.x2 = x2
         self.y2 = y2
-        self.x = x1  # Добавить эту строку
-        self.y = y1  # Добавить эту строку
 
         self._create_geometry()  # Изменили название
 
@@ -127,12 +124,12 @@ class Line(Shape):
     def to_dict(self) -> dict:
         return {
             "type": self.type_name,
-            "pos": [self.x, self.y],  # Сохраняем позицию
-            "props": {  # ЗАМЕНИТЬ "coords" на "props"
+            "pos": [self.pos().x(), self.pos().y()],  # Используем pos()
+            "props": {
                 "x1": self.x1, "y1": self.y1,
                 "x2": self.x2, "y2": self.y2,
                 "color": self.pen().color().name(),
-                "stroke_width": self.pen().width()  # Добавили толщину линии
+                "stroke_width": self.pen().width()
             }
         }
 
@@ -171,12 +168,12 @@ class Ellipse(Shape):
     def to_dict(self) -> dict:
         return {
             "type": self.type_name,
-            "pos": [self.x, self.y],  # Сохраняем позицию
-            "props": {  # ЗАМЕНИТЬ "coords" на "props"
+            "pos": [self.pos().x(), self.pos().y()],  # Используем pos()
+            "props": {
                 "x": self.x, "y": self.y,
                 "w": self.w, "h": self.h,
                 "color": self.pen().color().name(),
-                "stroke_width": self.pen().width()  # Добавили толщину линии
+                "stroke_width": self.pen().width()
             }
         }
 
@@ -203,14 +200,10 @@ class Group(QGraphicsItemGroup):
     def __init__(self, x=0, y=0):
         # Инициализация Qt-части
         QGraphicsItemGroup.__init__(self)
-        # Инициализация нашей Shape части с дефолтными параметрами
-        #Shape.__init__(self, "black", 2)
 
-        color = "black"
-        stroke_width = 2
-
-        self._color = color
-        self._stroke_width = stroke_width
+        # Сохраняем базовые свойства
+        self._color = "black"
+        self._stroke_width = 2
 
         # Устанавливаем позицию группы
         self.setPos(x, y)
@@ -253,7 +246,7 @@ class Group(QGraphicsItemGroup):
         """
         children_data = []
         for child in self.childItems():
-            if isinstance(child, Shape):
+            if hasattr(child, 'to_dict'):
                 children_data.append(child.to_dict())
 
         return {
