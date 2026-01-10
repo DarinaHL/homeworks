@@ -1,9 +1,10 @@
 # vector_editor/src/widgets/canvas.py
 from PySide6.QtWidgets import QGraphicsView, QGraphicsScene, QRubberBand, QGraphicsItemGroup
 from PySide6.QtCore import Qt, QPointF, QRect
-from PySide6.QtGui import QCursor, QMouseEvent
+from PySide6.QtGui import QCursor, QMouseEvent, QUndoStack  # ИЗМЕНИТЬ: QUndoStack из QtGui
 from src.logic.tools import CreationTool, SelectionTool
 from src.logic.shapes import Group
+from src.logic.commands import AddShapeCommand, MoveMultipleCommand, DeleteMultipleCommand
 
 
 class EditorCanvas(QGraphicsView):
@@ -12,6 +13,9 @@ class EditorCanvas(QGraphicsView):
         self.scene = QGraphicsScene(self)
         self.setScene(self.scene)
         self.scene.setSceneRect(0, 0, 800, 600)
+
+        # СТЕК ОТМЕНЫ (добавить этот атрибут)
+        self.undo_stack = QUndoStack(self)
 
         # Включаем отслеживание движения мыши (для смены курсора)
         self.setMouseTracking(True)
@@ -43,6 +47,7 @@ class EditorCanvas(QGraphicsView):
         # Для перетаскивания
         self.drag_start_pos = None
         self.drag_item = None
+        self.drag_initial_positions = []  # Для сохранения начальных позиций при перетаскивании
 
     def _init_tools(self):
         """Инициализация всех доступных инструментов"""
@@ -163,6 +168,9 @@ class EditorCanvas(QGraphicsView):
                         self.drag_item = item
                         self.drag_start_pos = event.pos()
                         self.is_dragging = True
+
+                        # Сохраняем начальные позиции всех выделенных элементов
+                        self._save_initial_positions()
                 else:
                     # Клик по пустому месту
                     if not shift_pressed:
@@ -179,13 +187,21 @@ class EditorCanvas(QGraphicsView):
             # Для других инструментов передаем событие дальше
             self.active_tool.mouse_press(event)
 
+    def _save_initial_positions(self):
+        """Сохраняет начальные позиции всех выделенных элементов"""
+        self.drag_initial_positions = []
+        selected_items = self.scene.selectedItems()
+        for item in selected_items:
+            if hasattr(item, 'type_name'):
+                self.drag_initial_positions.append((item, item.pos()))
+
     def mouseMoveEvent(self, event):
         if self.active_tool == self.tools["select"]:
             if self.is_selecting and self.rubber_band.isVisible():
                 # Обновляем rubber band
                 self.rubber_band.setGeometry(QRect(self.selection_start_pos, event.pos()).normalized())
 
-            elif self.is_dragging and self.drag_start_pos and self.drag_item:
+            elif self.is_dragging and self.drag_start_pos:
                 # Перетаскиваем ВСЕ выделенные элементы
                 selected_items = self.scene.selectedItems()
 
@@ -200,22 +216,12 @@ class EditorCanvas(QGraphicsView):
                     scene_delta = current_scene_pos - start_scene_pos
 
                     # Перемещаем все выделенные элементы
-                    for item in selected_items:
-                        if hasattr(item, 'type_name'):
-                            # Получаем текущую позицию
-                            current_item_pos = item.pos()
-
-                            # Если это первый шаг перетаскивания, запоминаем начальную позицию
-                            if not hasattr(item, '_drag_initial_pos'):
-                                item._drag_initial_pos = current_item_pos
-
+                    for i, (item, initial_pos) in enumerate(self.drag_initial_positions):
+                        if i < len(selected_items):
                             # Вычисляем новую позицию
-                            new_pos = item._drag_initial_pos + scene_delta
-
+                            new_pos = initial_pos + scene_delta
                             # Устанавливаем новую позицию
                             item.setPos(new_pos)
-
-                    print(f"Перетаскивание {len(selected_items)} элементов, delta: {scene_delta}")
 
             elif not self.is_dragging and not self.is_selecting:
                 # Просто движение курсора - меняем курсор
@@ -254,18 +260,33 @@ class EditorCanvas(QGraphicsView):
                         if hasattr(item, 'type_name'):
                             item.setSelected(True)
 
+                if self.is_dragging and self.drag_initial_positions:
+                    # Завершаем перетаскивание - создаем команду для отмены
+                    selected_items = self.scene.selectedItems()
+
+                    # Собираем текущие позиции
+                    current_positions = []
+                    old_positions = []
+                    items_list = []
+
+                    for item, initial_pos in self.drag_initial_positions:
+                        if item in selected_items:  # Проверяем, что элемент все еще выделен
+                            current_positions.append(item.pos())
+                            old_positions.append(initial_pos)
+                            items_list.append(item)
+
+                    if items_list and current_positions and old_positions:
+                        # Создаем команду перемещения
+                        command = MoveMultipleCommand(items_list, old_positions, current_positions)
+                        self.undo_stack.push(command)
+                        print(f"Создана команда перемещения для {len(items_list)} элементов")
+
                 if self.is_dragging:
                     # Завершаем перетаскивание
                     self.is_dragging = False
-
-                    # Очищаем временные данные перетаскивания
-                    selected_items = self.scene.selectedItems()
-                    for item in selected_items:
-                        if hasattr(item, '_drag_initial_pos'):
-                            del item._drag_initial_pos
-
                     self.drag_item = None
                     self.drag_start_pos = None
+                    self.drag_initial_positions = []
 
                     # Возвращаем нормальный курсор
                     pos = self.mapToScene(event.pos())
@@ -287,6 +308,28 @@ class EditorCanvas(QGraphicsView):
         super().leaveEvent(event)
         if not self.is_dragging and not self.is_selecting:
             self.setCursor(Qt.ArrowCursor)
+
+    def delete_selected(self):
+        """Удаляет выделенные элементы с поддержкой отмены"""
+        selected_items = self.scene.selectedItems()
+
+        if not selected_items:
+            return
+
+        # Фильтруем только наши фигуры
+        items_to_delete = []
+        for item in selected_items:
+            if hasattr(item, 'type_name'):
+                items_to_delete.append(item)
+
+        if items_to_delete:
+            # Создаем команду удаления
+            command = DeleteMultipleCommand(self.scene, items_to_delete)
+            self.undo_stack.push(command)
+            print(f"Создана команда удаления для {len(items_to_delete)} элементов")
+
+            # Очищаем выделение
+            self.scene.clearSelection()
 
     def group_selection(self):
         """Создает группу из выделенных элементов - ИСПРАВЛЕННАЯ версия"""

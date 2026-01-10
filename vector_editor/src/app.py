@@ -1,12 +1,12 @@
 # vector_editor/src/app.py
-from PySide6.QtGui import QCloseEvent, QAction
+from PySide6.QtGui import QCloseEvent, QAction, QKeySequence
 from PySide6.QtWidgets import QMainWindow, QMessageBox, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QFrame
 from PySide6.QtCore import Qt
 from src.widgets.canvas import EditorCanvas
 from src.widgets.properties import PropertiesPanel  # ИМПОРТИРУЕМ НОВЫЙ КЛАСС
-from PySide6.QtGui import QKeySequence
 from PySide6.QtWidgets import QColorDialog
 from PySide6.QtGui import QColor
+from PySide6.QtWidgets import QUndoView  # QUndoView остаётся в QtWidgets
 
 
 class VectorEditorWindow(QMainWindow):
@@ -37,6 +37,9 @@ class VectorEditorWindow(QMainWindow):
         menubar = self.menuBar()
         file_menu = menubar.addMenu("&File")
 
+        # Добавляем меню Edit
+        edit_menu = menubar.addMenu("&Edit")
+
         # 3. Создаем Action (Действие)
         exit_action = QAction("Exit", self)
         exit_action.setShortcut("Ctrl+Q")
@@ -46,12 +49,28 @@ class VectorEditorWindow(QMainWindow):
         # Добавляем Action в меню
         file_menu.addAction(exit_action)
 
-        # 4. Создаем Тулбар
-        toolbar = self.addToolBar("Main Toolbar")
-        toolbar.addAction(exit_action)
+        # Действие для Undo
+        undo_action = QAction("&Undo", self)
+        undo_action.setShortcut(QKeySequence.Undo)
+        undo_action.setStatusTip("Отменить последнее действие")
+        undo_action.triggered.connect(self.on_undo)
+        edit_menu.addAction(undo_action)
 
-        # Создаем меню Edit для группировки
-        edit_menu = self.menuBar().addMenu("&Edit")
+        # Действие для Redo
+        redo_action = QAction("&Redo", self)
+        redo_action.setShortcut(QKeySequence.Redo)
+        redo_action.setStatusTip("Повторить отмененное действие")
+        redo_action.triggered.connect(self.on_redo)
+        edit_menu.addAction(redo_action)
+
+        edit_menu.addSeparator()
+
+        # Действие для Delete
+        delete_action = QAction("&Delete", self)
+        delete_action.setShortcut(QKeySequence.Delete)
+        delete_action.setStatusTip("Удалить выделенные объекты")
+        delete_action.triggered.connect(self.on_delete)
+        edit_menu.addAction(delete_action)
 
         # Action для группировки - ИЗМЕНИТЬ на Shift+G
         group_action = QAction("&Group", self)
@@ -67,10 +86,40 @@ class VectorEditorWindow(QMainWindow):
         ungroup_action.setStatusTip("Ungroup selected items")
         edit_menu.addAction(ungroup_action)
 
-        # Добавить разделитель
-        edit_menu.addSeparator()
+        # Действие для показа истории команд (Wow-эффект)
+        history_action = QAction("&Show History", self)
+        history_action.setShortcut("Ctrl+H")
+        history_action.setStatusTip("Показать историю команд")
+        history_action.triggered.connect(self.on_show_history)
+        edit_menu.addAction(history_action)
+
+        # 4. Создаем Тулбар
+        toolbar = self.addToolBar("Main Toolbar")
+        toolbar.addAction(exit_action)
+        toolbar.addSeparator()
+        toolbar.addAction(undo_action)
+        toolbar.addAction(redo_action)
+        toolbar.addSeparator()
+        toolbar.addAction(delete_action)
 
         print("✓ Меню и тулбары созданы")
+
+    def on_undo(self):
+        """Обработчик для Undo"""
+        if self.canvas.undo_stack.canUndo():
+            self.canvas.undo_stack.undo()
+            print("Выполнено Undo")
+
+    def on_redo(self):
+        """Обработчик для Redo"""
+        if self.canvas.undo_stack.canRedo():
+            self.canvas.undo_stack.redo()
+            print("Выполнено Redo")
+
+    def on_delete(self):
+        """Обработчик для Delete"""
+        print("Нажата Delete - удаление выделенных элементов")
+        self.canvas.delete_selected()
 
     def on_group_selection(self):
         """Обработчик для группировки"""
@@ -81,6 +130,13 @@ class VectorEditorWindow(QMainWindow):
         """Обработчик для разгруппировки"""
         print("Нажата Shift+U - разгруппировка...")
         self.canvas.ungroup_selection()
+
+    def on_show_history(self):
+        """Показывает окно с историей команд (Wow-эффект)"""
+        self.history_window = QUndoView(self.canvas.undo_stack)
+        self.history_window.setWindowTitle("История команд")
+        self.history_window.resize(300, 400)
+        self.history_window.show()
 
     def _setup_layout(self):
         # 1. Создаем главный контейнер
@@ -178,6 +234,17 @@ class VectorEditorWindow(QMainWindow):
         color_tip_text.setStyleSheet("text-align: left; font-size: 10pt; background-color: #f8f8f8;")
         tools_layout.addWidget(color_tip_text)
 
+        # Добавим подсказку про Undo/Redo
+        undo_tip = QPushButton("Горячие клавиши:")
+        undo_tip.setEnabled(False)
+        undo_tip.setStyleSheet("text-align: left; font-style: italic; background-color: #f0f0f0;")
+        tools_layout.addWidget(undo_tip)
+
+        undo_tip_text = QPushButton("Ctrl+Z - Отменить\nCtrl+Y - Повторить\nDel - Удалить")
+        undo_tip_text.setEnabled(False)
+        undo_tip_text.setStyleSheet("text-align: left; font-size: 10pt; background-color: #f8f8f8;")
+        tools_layout.addWidget(undo_tip_text)
+
         tools_layout.addStretch()  # Пружина, которая прижмет кнопки наверх
 
         # СВЯЗЫВАЕМ СИГНАЛЫ КНОПОК С МЕТОДАМИ
@@ -189,7 +256,7 @@ class VectorEditorWindow(QMainWindow):
         self.btn_color.clicked.connect(self.on_change_color)
 
         # --- Создаем панель свойств ---
-        self.props_panel = PropertiesPanel(self.canvas.scene)
+        self.props_panel = PropertiesPanel(self.canvas.scene, self.canvas.undo_stack)  # Передаем undo_stack
         # Подключаем сигналы от панели свойств
         self.props_panel.color_changed.connect(self.on_props_color_changed)
         self.props_panel.stroke_width_changed.connect(self.on_props_stroke_width_changed)

@@ -2,7 +2,7 @@
 from abc import ABC, abstractmethod
 from PySide6.QtCore import Qt, QPointF
 from src.logic.factory import ShapeFactory
-from PySide6.QtWidgets import QGraphicsView
+from src.logic.commands import AddShapeCommand
 
 
 class Tool(ABC):
@@ -39,6 +39,7 @@ class CreationTool(Tool):
         self.current_shape = None  # Временная фигура для предпросмотра
         self.start_pos = None
         self.is_drawing = False
+        self.final_shape = None  # Добавляем атрибут для хранения финальной фигуры
 
     def mouse_press(self, event):
         """Начало рисования"""
@@ -77,10 +78,20 @@ class CreationTool(Tool):
                 self.scene.addItem(self.current_shape)
 
     def mouse_release(self, event):
-        """Завершение рисования - фигура фиксируется"""
+        """Завершение рисования - фигура фиксируется с помощью команды"""
         if event.button() == Qt.LeftButton and self.is_drawing:
-            # Фигура уже на сцене - просто сбрасываем ссылки
+            # Сохраняем финальную фигуру
+            self.final_shape = self.current_shape
+
+            # Создаем команду для отмены/повтора
+            if self.final_shape:
+                command = AddShapeCommand(self.scene, self.final_shape)
+                self.view.undo_stack.push(command)
+                print(f"Создана команда добавления {self.shape_type}")
+
+            # Сбрасываем ссылки
             self.current_shape = None
+            self.final_shape = None
             self.is_drawing = False
 
 

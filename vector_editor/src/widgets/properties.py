@@ -5,6 +5,7 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import QColorDialog
 from PySide6.QtGui import QColor
 from src.logic.shapes import Shape, Group
+from src.logic.commands import ChangeColorMultipleCommand, ChangeWidthMultipleCommand
 
 
 class PropertiesPanel(QWidget):
@@ -15,9 +16,10 @@ class PropertiesPanel(QWidget):
     stroke_width_changed = Signal(int)
     position_changed = Signal(float, float)
 
-    def __init__(self, scene):
+    def __init__(self, scene, undo_stack=None):  # Добавили параметр undo_stack
         super().__init__()
         self.scene = scene
+        self.undo_stack = undo_stack  # Сохраняем ссылку на стек отмены
 
         # Настройка UI
         self._init_ui()
@@ -186,24 +188,30 @@ class PropertiesPanel(QWidget):
 
     # --- VIEW -> MODEL (Изменение данных) ---
     def on_width_changed(self, value):
-        """Изменение толщины линии"""
+        """Изменение толщины линии с поддержкой отмены"""
         selected_items = self.scene.selectedItems()
 
+        if not selected_items or not self.undo_stack:
+            return
+
+        # Фильтруем только наши фигуры
+        items_to_change = []
+        old_widths = []
         for item in selected_items:
-            if hasattr(item, "pen"):
-                # Для Shape объектов
-                pen = item.pen()
-                pen.setWidth(value)
-                item.setPen(pen)
-            elif hasattr(item, "set_stroke_width"):
-                # Для наших классов (если реализован метод)
-                item.set_stroke_width(value)
+            if hasattr(item, 'type_name'):
+                items_to_change.append(item)
+                old_widths.append(item.pen().width() if hasattr(item, 'pen') else 2)
+
+        if items_to_change:
+            # Создаем команду изменения толщины
+            command = ChangeWidthMultipleCommand(items_to_change, value, old_widths)
+            self.undo_stack.push(command)
 
         self.scene.update()
         self.stroke_width_changed.emit(value)
 
     def on_color_clicked(self):
-        """Открытие диалога выбора цвета"""
+        """Открытие диалога выбора цвета с поддержкой отмены"""
         # Получаем текущий цвет кнопки
         current_style = self.btn_color.styleSheet()
         current_color = "#000000"
@@ -227,15 +235,27 @@ class PropertiesPanel(QWidget):
                 border-radius: 4px;
             """)
 
-            # Применяем цвет к выделенным объектам
+            # Применяем цвет к выделенным объектам с поддержкой отмены
             selected_items = self.scene.selectedItems()
+
+            if not selected_items or not self.undo_stack:
+                return
+
+            # Фильтруем только наши фигуры
+            items_to_change = []
+            old_colors = []
             for item in selected_items:
-                if hasattr(item, "set_active_color"):
-                    item.set_active_color(hex_color)
-                elif hasattr(item, "setPen"):
-                    pen = item.pen()
-                    pen.setColor(color)
-                    item.setPen(pen)
+                if hasattr(item, 'type_name'):
+                    items_to_change.append(item)
+                    if hasattr(item, 'pen'):
+                        old_colors.append(item.pen().color().name())
+                    else:
+                        old_colors.append("#000000")
+
+            if items_to_change:
+                # Создаем команду изменения цвета
+                command = ChangeColorMultipleCommand(items_to_change, hex_color, old_colors)
+                self.undo_stack.push(command)
 
             self.scene.update()
             self.color_changed.emit(hex_color)
